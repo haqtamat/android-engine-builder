@@ -10,52 +10,28 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
-        id: setup-ndk
         with:
-          ndk-version: r26d
-      - name: Install tools
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ make zip unzip
+          ndk-version: r25c
       - name: Unzip source if zip present
         run: |
-          if [ -f source.zip ]; then unzip -o source.zip -d src_unzipped; ls -R src_unzipped | head -n 100; fi
-          ls -la
+          ls -lh
+          if [ -f source.zip ]; then unzip -o source.zip -d src_unzipped; fi
+          if [ -f Stockfish-sf_19.zip ]; then unzip -o Stockfish-sf_19.zip -d src_unzipped; fi
+          ls -R | head -n 100
       - name: Build Android Binary
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
-          echo "NDK=$ANDROID_NDK_HOME"
-          mkdir -p out
-          # Case 1: If CMakeLists.txt exists in root or unzipped folder
-          ROOT="."
-          if [ -f src_unzipped/CMakeLists.txt ]; then ROOT="src_unzipped"; fi
-          if [ -f src_unzipped/*/CMakeLists.txt ]; then ROOT=$(dirname src_unzipped/*/CMakeLists.txt); fi
-          # Case 2: Stockfish src folder
-          if [ -f src_unzipped/src/Makefile ]; then
-            echo "Stockfish detected - building with NDK make"
-            cd src_unzipped/src
-            make build ARCH=arm64-v8a COMPILER=clang++ -j4 || make build ARCH=armv7 COMPILER=clang++ -j4 || make -j4
-            cp -v stockfish* ../../out/ || cp -v stockfish ../../out/ || true
-            cd ../..
-          elif [ -f "$ROOT/CMakeLists.txt" ]; then
-            for ABI in arm64-v8a armeabi-v7a x86_64; do
-              echo "Building $ABI"
-              cmake -B build-$ABI -S $ROOT -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=$ABI -DANDROID_PLATFORM=android-21 -DCMAKE_BUILD_TYPE=Release || continue
-              cmake --build build-$ABI -j4 || continue
-              find build-$ABI -type f -executable -not -name "*.a" -not -name "*.so" -exec cp {} out/{}-$ABI \; || true
-              find build-$ABI -name "*.so" -exec cp {} out/ \; || true
-            done
-          else
-            # Case 3: Single file main.cpp / *.cpp
-            for ABI in arm64-v8a armeabi-v7a; do
-              if [ "$ABI" = "arm64-v8a" ]; then TRIPLE="aarch64-linux-android21-clang++"; else TRIPLE="armv7a-linux-androideabi21-clang++"; fi
-              $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/$TRIPLE -O3 -std=c++17 -o out/engine-$ABI *.cpp src/*.cpp 2>/dev/null || $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/$TRIPLE -O3 -std=c++17 -o out/engine-$ABI main.cpp 2>/dev/null || true
-            done
-          fi
-          ls -lh out/ || true
-          # Rename to engine name
-          for f in out/*; do echo "Built: $f"; done
+          SRC_DIR=$(find src_unzipped -name Makefile | head -n 1 | xargs dirname)
+          echo "SRC_DIR=$SRC_DIR"
+          cd "$SRC_DIR"
+          export NDK_BIN=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+          export CXX=$NDK_BIN/aarch64-linux-android21-clang++
+          export CC=$NDK_BIN/aarch64-linux-android21-clang
+          make -j4 build ARCH=armv8 COMP=clang
+          ls -lh stockfish
+          mkdir -p $GITHUB_WORKSPACE/out
+          cp stockfish $GITHUB_WORKSPACE/out/stockfish-android-arm64-v8a
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: android-binary
+          name: android-engine-arm64-v8a
           path: out/
