@@ -13,8 +13,8 @@ jobs:
         run: |
           ls -la
           unzip -o Stockfish-sf_19.zip -d extracted
-          ls -la extracted/src
-          echo "SRC_DIR=extracted/src" >> $GITHUB_ENV
+          ls -la extracted/Stockfish-sf_19/src
+          echo "SRC_DIR=extracted/Stockfish-sf_19/src" >> $GITHUB_ENV
       - name: Build Android Binary
         run: |
           set -e
