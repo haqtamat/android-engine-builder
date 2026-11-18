@@ -23,7 +23,17 @@ jobs:
           ls -la
           sed -i 's/-lpthread -lrt//g; s/-lpthread//g; s/-lrt//g' Makefile
           make -j4 build ARCH=armv7 COMP=clang CXX=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang++
-          $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip stockfish
+          echo "=== BEFORE STRIP ==="
+          ls -lh stockfish
+          file stockfish || true
+          STRIP=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip
+          ls -lh $STRIP || echo "llvm-strip NOT FOUND"
+          $STRIP --strip-all stockfish || $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-strip stockfish || strip stockfish || true
+          echo "=== AFTER STRIP ==="
+          ls -lh stockfish
+          sudo apt-get update -qq && sudo apt-get install -y -qq upx-ucl
+          upx --best --lzma stockfish || true
+          echo "=== AFTER UPX ==="
           ls -lh stockfish
           mkdir -p $GITHUB_WORKSPACE/out
           cp stockfish $GITHUB_WORKSPACE/out/
